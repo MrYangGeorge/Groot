@@ -821,7 +821,7 @@ function renderDiagnoses(diagnoses) {
     <div class="diag-item">
       <div class="diag-thumb">${d.emoji}</div>
       <div class="diag-label">${d.predicted_class}</div>
-      <div class="diag-conf">${d.confidence}% conf</div>
+      <div class="diag-conf">${d.confidence}% confidence</div>
       <span class="diag-badge ${d.severity}">${d.severity}</span>
     </div>
   `).join('');
@@ -864,7 +864,7 @@ function renderAggregateDiagnosis(diagnoses) {
     </div>
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
       <span class="diag-badge ${overallSeverity}" style="font-size:13px;padding:6px 14px;">${overallLabel}</span>
-      <span style="font-size:12px;color:var(--text-secondary);">avg conf: ${avgConf}%</span>
+      <span style="font-size:12px;color:var(--text-secondary);">avg confidence: ${avgConf}%</span>
     </div>
     <p style="font-size:13px;color:var(--text-secondary);line-height:1.5;">${overallMessage}</p>
     <div style="margin-top:12px;display:flex;gap:8px;">
