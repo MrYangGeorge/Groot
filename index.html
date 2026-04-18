@@ -1,0 +1,1124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Verdant — Houseplant Monitor</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg-primary: #0f1a12;
+    --bg-card: #162119;
+    --bg-card-alt: #1a2b1f;
+    --border: #2a3d2e;
+    --text-primary: #e8f0ea;
+    --text-secondary: #8fa896;
+    --text-muted: #5c7a63;
+    --accent-green: #4ecb71;
+    --accent-teal: #3ab5a0;
+    --accent-amber: #e6a44e;
+    --accent-coral: #e06b5e;
+    --accent-blue: #5b9bd5;
+    --accent-green-dim: rgba(78,203,113,0.15);
+    --accent-teal-dim: rgba(58,181,160,0.15);
+    --accent-amber-dim: rgba(230,164,78,0.15);
+    --accent-coral-dim: rgba(224,107,94,0.15);
+    --radius: 14px;
+    --radius-sm: 8px;
+    --shadow: 0 2px 12px rgba(0,0,0,0.3);
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  html {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    max-width: 430px;
+    margin: 0 auto;
+    min-height: 100vh;
+    background: var(--bg-primary);
+    position: relative;
+    overflow-x: hidden;
+  }
+
+  /* ── Ambient glow ── */
+  body::before {
+    content: '';
+    position: fixed;
+    top: -120px; left: 50%;
+    transform: translateX(-50%);
+    width: 500px; height: 500px;
+    background: radial-gradient(circle, rgba(78,203,113,0.08) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .app { position: relative; z-index: 1; padding: 0 16px 32px; }
+
+  /* ── Header ── */
+  .header {
+    padding: 52px 0 20px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .header h1 {
+    font-family: 'DM Serif Display', serif;
+    font-size: 28px; font-weight: 400;
+    letter-spacing: -0.3px;
+    background: linear-gradient(135deg, var(--accent-green), var(--accent-teal));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .header .badge {
+    font-size: 11px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 1.2px;
+    color: var(--accent-green);
+    background: var(--accent-green-dim);
+    padding: 5px 10px; border-radius: 20px;
+  }
+
+  /* ── Status strip ── */
+  .status-strip {
+    display: flex; gap: 8px; margin-bottom: 20px;
+    overflow-x: auto; scrollbar-width: none;
+  }
+  .status-strip::-webkit-scrollbar { display: none; }
+  .stat-pill {
+    flex: 0 0 auto;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 40px;
+    padding: 8px 14px;
+    display: flex; align-items: center; gap: 8px;
+    font-size: 13px; font-weight: 500;
+    white-space: nowrap;
+    animation: fadeUp 0.5s ease both;
+  }
+  .stat-pill .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .stat-pill .label { color: var(--text-secondary); }
+  .stat-pill .value { color: var(--text-primary); font-weight: 600; }
+
+  /* ── Cards ── */
+  .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px;
+    margin-bottom: 14px;
+    box-shadow: var(--shadow);
+    animation: fadeUp 0.5s ease both;
+  }
+  .card-title {
+    font-size: 13px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 1px;
+    color: var(--text-muted);
+    margin-bottom: 14px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .card-title .icon {
+    width: 18px; height: 18px; border-radius: 5px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px;
+  }
+
+  /* ── Chart container ── */
+  .chart-wrap {
+    position: relative;
+    height: 180px;
+    margin: 0 -4px;
+  }
+  .chart-wrap canvas { width: 100% !important; height: 100% !important; }
+
+  /* ── Diagnosis section ── */
+  .diagnosis-grid {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .diag-item {
+    background: var(--bg-card-alt);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 12px;
+    text-align: center;
+    transition: transform 0.2s, border-color 0.2s;
+  }
+  .diag-item:hover {
+    transform: translateY(-2px);
+    border-color: var(--accent-green);
+  }
+  .diag-thumb {
+    width: 100%; aspect-ratio: 4/3;
+    border-radius: 6px;
+    background: var(--bg-primary);
+    margin-bottom: 8px;
+    overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 32px;
+  }
+  .diag-label {
+    font-size: 12px; font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 2px;
+  }
+  .diag-conf {
+    font-size: 11px; color: var(--text-secondary);
+  }
+  .diag-badge {
+    display: inline-block;
+    font-size: 10px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.8px;
+    padding: 3px 8px; border-radius: 20px;
+    margin-top: 6px;
+  }
+  .diag-badge.healthy { background: var(--accent-green-dim); color: var(--accent-green); }
+  .diag-badge.warning { background: var(--accent-amber-dim); color: var(--accent-amber); }
+  .diag-badge.danger  { background: var(--accent-coral-dim); color: var(--accent-coral); }
+
+  /* ── Sunlight timeline ── */
+  .sun-timeline {
+    display: flex; gap: 3px; align-items: end;
+    height: 50px; margin-top: 6px;
+  }
+  .sun-bar {
+    flex: 1;
+    border-radius: 3px 3px 0 0;
+    min-height: 6px;
+    transition: height 0.4s ease;
+    position: relative;
+  }
+  .sun-bar.hi { background: var(--accent-amber); }
+  .sun-bar.lo { background: var(--accent-amber-dim); }
+  .sun-labels {
+    display: flex; justify-content: space-between;
+    font-size: 10px; color: var(--text-muted);
+    margin-top: 6px;
+  }
+
+  /* ── Aggregate summary ── */
+  .agg-grid {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .agg-item {
+    background: var(--bg-card-alt);
+    border-radius: var(--radius-sm);
+    padding: 14px;
+  }
+  .agg-item .agg-label {
+    font-size: 11px; color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: 0.6px;
+    margin-bottom: 4px;
+  }
+  .agg-item .agg-value {
+    font-family: 'DM Serif Display', serif;
+    font-size: 24px; color: var(--text-primary);
+  }
+  .agg-item .agg-unit {
+    font-size: 13px; color: var(--text-secondary);
+    font-family: 'DM Sans', sans-serif;
+  }
+  .agg-item .agg-range {
+    font-size: 10px; color: var(--text-muted);
+    margin-top: 2px;
+  }
+
+  /* ── Section divider ── */
+  .section-label {
+    font-family: 'DM Serif Display', serif;
+    font-size: 20px; color: var(--text-primary);
+    margin: 28px 0 14px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .section-label::after {
+    content: '';
+    flex: 1; height: 1px;
+    background: var(--border);
+  }
+
+  /* ── Data source toggle ── */
+  .source-toggle {
+    display: flex; gap: 0;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 40px;
+    padding: 3px;
+    margin-bottom: 20px;
+  }
+  .source-btn {
+    flex: 1;
+    padding: 8px 0;
+    text-align: center;
+    font-size: 12px; font-weight: 600;
+    border-radius: 40px;
+    border: none; cursor: pointer;
+    background: transparent;
+    color: var(--text-muted);
+    transition: all 0.25s;
+  }
+  .source-btn.active {
+    background: var(--accent-green);
+    color: var(--bg-primary);
+  }
+
+  /* ── Footer ── */
+  .footer {
+    text-align: center;
+    padding: 24px 0 8px;
+    font-size: 11px;
+    color: var(--text-muted);
+    letter-spacing: 0.5px;
+  }
+
+  /* ── Prediction card ── */
+  .predict-card {
+    background: linear-gradient(135deg, var(--bg-card) 0%, var(--bg-card-alt) 100%);
+    border: 1px solid var(--accent-green);
+    border-radius: var(--radius);
+    padding: 20px;
+    margin-bottom: 14px;
+    box-shadow: var(--shadow), 0 0 20px rgba(78,203,113,0.08);
+    animation: fadeUp 0.5s ease both;
+    position: relative;
+    overflow: hidden;
+  }
+  .predict-card::before {
+    content: '';
+    position: absolute;
+    top: -40px; right: -40px;
+    width: 120px; height: 120px;
+    background: radial-gradient(circle, rgba(78,203,113,0.1) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .predict-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-top: 14px;
+  }
+  .predict-hero {
+    text-align: center;
+    flex: 0 0 auto;
+  }
+  .predict-hero .big-num {
+    font-family: 'DM Serif Display', serif;
+    font-size: 40px;
+    line-height: 1;
+    background: linear-gradient(135deg, var(--accent-green), var(--accent-teal));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .predict-hero .big-unit {
+    font-size: 14px; color: var(--text-secondary);
+    font-family: 'DM Sans', sans-serif;
+  }
+  .predict-details {
+    flex: 1;
+  }
+  .predict-details .detail-row {
+    display: flex; justify-content: space-between;
+    padding: 5px 0;
+    border-bottom: 1px solid rgba(42,61,46,0.4);
+    font-size: 12px;
+  }
+  .predict-details .detail-row:last-child { border-bottom: none; }
+  .predict-details .detail-label { color: var(--text-muted); }
+  .predict-details .detail-value { color: var(--text-primary); font-weight: 600; }
+  .predict-method {
+    margin-top: 12px;
+    font-size: 10px;
+    color: var(--text-muted);
+    font-style: italic;
+  }
+
+  /* ── Animations ── */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .delay-1 { animation-delay: 0.05s; }
+  .delay-2 { animation-delay: 0.10s; }
+  .delay-3 { animation-delay: 0.15s; }
+  .delay-4 { animation-delay: 0.20s; }
+  .delay-5 { animation-delay: 0.25s; }
+  .delay-6 { animation-delay: 0.30s; }
+  .delay-7 { animation-delay: 0.35s; }
+  .delay-8 { animation-delay: 0.40s; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Header -->
+  <div class="header">
+    <h1>Verdant</h1>
+    <span class="badge">● Live</span>
+  </div>
+
+  <!-- Data source toggle -->
+  <div class="source-toggle">
+    <button class="source-btn active" onclick="setSource('dummy')">Dummy Data</button>
+    <button class="source-btn" onclick="setSource('api')">FastAPI Server</button>
+  </div>
+
+  <!-- Status pills -->
+  <div class="status-strip" id="statusStrip"></div>
+
+  <!-- Section: Sensor Trends -->
+  <div class="section-label">Sensor Trends</div>
+
+  <!-- Soil Moisture Chart -->
+  <div class="card delay-1">
+    <div class="card-title">
+      <span class="icon" style="background:var(--accent-teal-dim);color:var(--accent-teal);">💧</span>
+      Soil Moisture
+    </div>
+    <div class="chart-wrap"><canvas id="chartMoisture"></canvas></div>
+  </div>
+
+  <!-- Temperature Chart -->
+  <div class="card delay-2">
+    <div class="card-title">
+      <span class="icon" style="background:var(--accent-coral-dim);color:var(--accent-coral);">🌡</span>
+      Temperature
+    </div>
+    <div class="chart-wrap"><canvas id="chartTemp"></canvas></div>
+  </div>
+
+  <!-- Humidity Chart -->
+  <div class="card delay-3">
+    <div class="card-title">
+      <span class="icon" style="background:var(--accent-blue);opacity:0.25;">💨</span>
+      Humidity
+    </div>
+    <div class="chart-wrap"><canvas id="chartHumidity"></canvas></div>
+  </div>
+
+  <!-- Sunlight Timeline -->
+  <div class="card delay-4">
+    <div class="card-title">
+      <span class="icon" style="background:var(--accent-amber-dim);color:var(--accent-amber);">☀️</span>
+      Sunlight (HI / LO)
+    </div>
+    <div class="sun-timeline" id="sunTimeline"></div>
+    <div class="sun-labels"><span>Day 1</span><span>Day 7</span></div>
+  </div>
+
+  <!-- Section: Weekly Aggregates -->
+  <div class="section-label">Weekly Summary</div>
+  <div class="card delay-5">
+    <div class="agg-grid" id="aggGrid"></div>
+  </div>
+
+  <!-- Section: Plant Diagnosis -->
+  <div class="section-label">Growth Tracking</div>
+
+  <!-- Height over time chart -->
+  <div class="card delay-5b" style="animation-delay:0.27s;">
+    <div class="card-title">
+      <span class="icon" style="background:var(--accent-green-dim);color:var(--accent-green);">📏</span>
+      Plant Height
+    </div>
+    <div class="chart-wrap"><canvas id="chartHeight"></canvas></div>
+  </div>
+
+  <!-- Growth rate chart -->
+  <div class="card delay-5c" style="animation-delay:0.30s;">
+    <div class="card-title">
+      <span class="icon" style="background:var(--accent-teal-dim);color:var(--accent-teal);">📈</span>
+      Growth Rate
+    </div>
+    <div class="chart-wrap"><canvas id="chartGrowthRate"></canvas></div>
+  </div>
+
+  <!-- 1-week prediction -->
+  <div class="predict-card delay-5d" style="animation-delay:0.33s;" id="predictCard"></div>
+
+  <!-- Section: Plant Diagnosis -->
+  <div class="section-label">Plant Diagnosis</div>
+  <div class="card delay-6">
+    <div class="card-title">
+      <span class="icon" style="background:var(--accent-green-dim);color:var(--accent-green);">🔬</span>
+      crop-leaf-diseases-vit results
+    </div>
+    <p style="font-size:12px;color:var(--text-secondary);margin-bottom:14px;">
+      Each snapshot was passed through <code style="color:var(--accent-teal);background:var(--accent-teal-dim);padding:2px 6px;border-radius:4px;font-size:11px;">wambugu71/crop_leaf_diseases_vit</code>. Aggregated diagnosis below.
+    </p>
+    <div class="diagnosis-grid" id="diagGrid"></div>
+  </div>
+
+  <!-- Aggregate diagnosis -->
+  <div class="card delay-7" id="aggDiagCard"></div>
+
+  <div class="footer">VERDANT v0.2 · houseplant telemetry dashboard</div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+//  DATA SERVICE — swap this module to switch data sources
+// ═══════════════════════════════════════════════════════════
+
+const DataService = (() => {
+
+  // ── Configuration ──
+  // Change this to your FastAPI base URL when ready
+  const API_BASE = "http://localhost:8000";
+
+  let currentSource = "dummy"; // "dummy" | "api"
+
+  // ── Dummy data generator ──
+  function _generateDummyData(n = 14) {
+    const now = Date.now();
+    const weekMs = 7 * 24 * 60 * 60 * 1000;
+    const startTime = now - weekMs;
+    const points = [];
+
+    // Generate n random timestamps across the week
+    const timestamps = Array.from({ length: n }, () =>
+      startTime + Math.random() * weekMs
+    ).sort((a, b) => a - b);
+
+    // Realistic houseplant sensor ranges
+    const baseMoisture = 400 + Math.random() * 200; // 400-600 center
+    const baseTemp = 20 + Math.random() * 4;         // 20-24 center
+    const baseHumidity = 45 + Math.random() * 15;     // 45-60 center
+
+    for (let i = 0; i < n; i++) {
+      const t = timestamps[i];
+      const dayProgress = (t - startTime) / weekMs;
+      const hour = new Date(t).getHours();
+      const isDaytime = hour >= 7 && hour <= 19;
+
+      // Soil moisture drifts down over the week (drying out)
+      const moistureDrift = -dayProgress * 180;
+      const moisture = Math.max(80, Math.min(1023,
+        baseMoisture + moistureDrift + (Math.random() - 0.5) * 60
+      ));
+
+      // Temperature varies by time of day
+      const tempDiurnal = isDaytime ? 2.5 : -1.5;
+      const temp = +(baseTemp + tempDiurnal + (Math.random() - 0.5) * 3).toFixed(1);
+
+      // Humidity inversely related to temp
+      const humidity = +(baseHumidity - (temp - baseTemp) * 1.5 + (Math.random() - 0.5) * 8).toFixed(1);
+
+      // Sunlight: HI during daytime, LO at night, some randomness
+      const sunlight = isDaytime ? (Math.random() > 0.2 ? "HI" : "LO") : "LO";
+
+      // Height: starts at a base and grows ~0.3-0.8 cm/day with noise
+      const baseHeight = 8 + Math.random() * 6; // 8-14 cm starting height
+      const dailyGrowth = 0.3 + Math.random() * 0.5; // cm per day
+      const dayElapsed = dayProgress * 7;
+      const height = +(baseHeight + dayElapsed * dailyGrowth + (Math.random() - 0.5) * 0.4).toFixed(2);
+
+      points.push({
+        timestamp: new Date(t).toISOString(),
+        soil_moisture: Math.round(moisture),
+        temperature_c: temp,
+        humidity_pct: Math.max(15, Math.min(95, humidity)),
+        sunlight: sunlight,
+        height_cm: height,
+        image_id: `snapshot_${String(i + 1).padStart(2, '0')}`,
+      });
+    }
+    return points;
+  }
+
+  // ── Dummy diagnosis results ──
+  // Simulates running each image through crop-leaf-diseases-vit
+  function _generateDummyDiagnoses(dataPoints) {
+    const classes = [
+      { label: "Healthy", severity: "healthy" },
+      { label: "Leaf Spot", severity: "warning" },
+      { label: "Powdery Mildew", severity: "warning" },
+      { label: "Leaf Blight", severity: "danger" },
+      { label: "Healthy", severity: "healthy" },
+      { label: "Healthy", severity: "healthy" },
+    ];
+    const plantEmojis = ["🌿", "🍃", "🌱", "☘️", "🪴", "🌾", "🍂", "🌵", "🌴", "🪻", "🌳", "🎋", "🎍", "🍀"];
+
+    return dataPoints.map((pt, i) => {
+      const cls = classes[i % classes.length];
+      const conf = cls.severity === "healthy"
+        ? (85 + Math.random() * 14).toFixed(1)
+        : (55 + Math.random() * 30).toFixed(1);
+      return {
+        image_id: pt.image_id,
+        timestamp: pt.timestamp,
+        predicted_class: cls.label,
+        confidence: +conf,
+        severity: cls.severity,
+        emoji: plantEmojis[i % plantEmojis.length],
+      };
+    });
+  }
+
+  // ── FastAPI fetchers (implement when backend is ready) ──
+  async function _fetchFromAPI() {
+    const resp = await fetch(`${API_BASE}/data`);
+    if (!resp.ok) throw new Error(`API error: ${resp.status}`);
+    return resp.json();
+    // Expected response shape:
+    // {
+    //   data_points: [ { timestamp, soil_moisture, temperature_c, humidity_pct, sunlight, height_cm, image_id } ],
+    //   diagnoses:   [ { image_id, predicted_class, confidence, severity } ]
+    // }
+  }
+
+  // ── Public API ──
+  return {
+    setSource(src) { currentSource = src; },
+    getSource() { return currentSource; },
+
+    async getData(n = 14) {
+      if (currentSource === "api") {
+        try {
+          const result = await _fetchFromAPI();
+          return result;
+        } catch (e) {
+          console.error("FastAPI fetch failed, falling back to dummy:", e);
+          // Fall through to dummy
+        }
+      }
+      const points = _generateDummyData(n);
+      const diagnoses = _generateDummyDiagnoses(points);
+      return { data_points: points, diagnoses };
+    }
+  };
+})();
+
+
+// ═══════════════════════════════════════════════════════════
+//  CHART CONFIGURATION
+// ═══════════════════════════════════════════════════════════
+
+const chartDefaults = {
+  responsive: true,
+  maintainAspectRatio: false,
+  animation: { duration: 800, easing: 'easeOutQuart' },
+  plugins: {
+    legend: { display: false },
+    tooltip: {
+      backgroundColor: '#1a2b1f',
+      titleColor: '#e8f0ea',
+      bodyColor: '#8fa896',
+      borderColor: '#2a3d2e',
+      borderWidth: 1,
+      cornerRadius: 8,
+      padding: 10,
+      titleFont: { family: 'DM Sans', size: 12, weight: '600' },
+      bodyFont: { family: 'DM Sans', size: 11 },
+    },
+  },
+  scales: {
+    x: {
+      type: 'time',
+      time: { unit: 'day', displayFormats: { day: 'EEE' } },
+      grid: { color: 'rgba(42,61,46,0.4)', drawBorder: false },
+      ticks: { color: '#5c7a63', font: { family: 'DM Sans', size: 10 } },
+      border: { display: false },
+    },
+    y: {
+      grid: { color: 'rgba(42,61,46,0.3)', drawBorder: false },
+      ticks: { color: '#5c7a63', font: { family: 'DM Sans', size: 10 }, maxTicksLimit: 5 },
+      border: { display: false },
+    },
+  },
+  elements: {
+    point: { radius: 4, hoverRadius: 6, borderWidth: 2 },
+    line: { tension: 0.35, borderWidth: 2.5 },
+  },
+};
+
+function createGradient(ctx, c1, c2) {
+  const g = ctx.createLinearGradient(0, 0, 0, 180);
+  g.addColorStop(0, c1);
+  g.addColorStop(1, c2);
+  return g;
+}
+
+
+// ═══════════════════════════════════════════════════════════
+//  RENDERING
+// ═══════════════════════════════════════════════════════════
+
+let charts = {};
+
+function destroyCharts() {
+  Object.values(charts).forEach(c => c.destroy());
+  charts = {};
+}
+
+function renderStatusPills(data) {
+  const latest = data[data.length - 1];
+  const moisturePct = ((latest.soil_moisture / 1023) * 100).toFixed(0);
+  const strip = document.getElementById('statusStrip');
+  strip.innerHTML = `
+    <div class="stat-pill">
+      <span class="dot" style="background:var(--accent-teal)"></span>
+      <span class="label">Moisture</span>
+      <span class="value">${moisturePct}%</span>
+    </div>
+    <div class="stat-pill">
+      <span class="dot" style="background:var(--accent-coral)"></span>
+      <span class="label">Temp</span>
+      <span class="value">${latest.temperature_c}°C</span>
+    </div>
+    <div class="stat-pill">
+      <span class="dot" style="background:var(--accent-blue)"></span>
+      <span class="label">Humidity</span>
+      <span class="value">${latest.humidity_pct}%</span>
+    </div>
+    <div class="stat-pill">
+      <span class="dot" style="background:var(--accent-amber)"></span>
+      <span class="label">Sun</span>
+      <span class="value">${latest.sunlight}</span>
+    </div>
+    <div class="stat-pill">
+      <span class="dot" style="background:var(--accent-green)"></span>
+      <span class="label">Height</span>
+      <span class="value">${latest.height_cm} cm</span>
+    </div>
+  `;
+}
+
+function renderCharts(data) {
+  const timestamps = data.map(d => new Date(d.timestamp));
+
+  // Moisture
+  const ctxM = document.getElementById('chartMoisture').getContext('2d');
+  charts.moisture = new Chart(ctxM, {
+    type: 'line',
+    data: {
+      labels: timestamps,
+      datasets: [{
+        data: data.map(d => d.soil_moisture),
+        borderColor: '#3ab5a0',
+        backgroundColor: createGradient(ctxM, 'rgba(58,181,160,0.25)', 'rgba(58,181,160,0)'),
+        fill: true,
+        pointBackgroundColor: '#162119',
+        pointBorderColor: '#3ab5a0',
+      }],
+    },
+    options: {
+      ...chartDefaults,
+      scales: {
+        ...chartDefaults.scales,
+        y: { ...chartDefaults.scales.y, min: 0, max: 1023,
+          ticks: { ...chartDefaults.scales.y.ticks, callback: v => v } },
+      },
+    },
+  });
+
+  // Temperature
+  const ctxT = document.getElementById('chartTemp').getContext('2d');
+  charts.temp = new Chart(ctxT, {
+    type: 'line',
+    data: {
+      labels: timestamps,
+      datasets: [{
+        data: data.map(d => d.temperature_c),
+        borderColor: '#e06b5e',
+        backgroundColor: createGradient(ctxT, 'rgba(224,107,94,0.2)', 'rgba(224,107,94,0)'),
+        fill: true,
+        pointBackgroundColor: '#162119',
+        pointBorderColor: '#e06b5e',
+      }],
+    },
+    options: {
+      ...chartDefaults,
+      scales: {
+        ...chartDefaults.scales,
+        y: { ...chartDefaults.scales.y,
+          ticks: { ...chartDefaults.scales.y.ticks, callback: v => v + '°' } },
+      },
+    },
+  });
+
+  // Humidity
+  const ctxH = document.getElementById('chartHumidity').getContext('2d');
+  charts.humidity = new Chart(ctxH, {
+    type: 'line',
+    data: {
+      labels: timestamps,
+      datasets: [{
+        data: data.map(d => d.humidity_pct),
+        borderColor: '#5b9bd5',
+        backgroundColor: createGradient(ctxH, 'rgba(91,155,213,0.2)', 'rgba(91,155,213,0)'),
+        fill: true,
+        pointBackgroundColor: '#162119',
+        pointBorderColor: '#5b9bd5',
+      }],
+    },
+    options: {
+      ...chartDefaults,
+      scales: {
+        ...chartDefaults.scales,
+        y: { ...chartDefaults.scales.y, min: 0, max: 100,
+          ticks: { ...chartDefaults.scales.y.ticks, callback: v => v + '%' } },
+      },
+    },
+  });
+}
+
+function renderSunlight(data) {
+  const container = document.getElementById('sunTimeline');
+  container.innerHTML = '';
+  data.forEach((d) => {
+    const bar = document.createElement('div');
+    bar.className = `sun-bar ${d.sunlight.toLowerCase()}`;
+    bar.style.height = d.sunlight === 'HI' ? '100%' : '30%';
+    bar.title = `${new Date(d.timestamp).toLocaleString()} — ${d.sunlight}`;
+    container.appendChild(bar);
+  });
+}
+
+function renderAggregates(data) {
+  const moistures = data.map(d => d.soil_moisture);
+  const temps = data.map(d => d.temperature_c);
+  const humids = data.map(d => d.humidity_pct);
+  const hiCount = data.filter(d => d.sunlight === 'HI').length;
+  const hiPct = ((hiCount / data.length) * 100).toFixed(0);
+
+  const avg = arr => (arr.reduce((a, b) => a + b, 0) / arr.length).toFixed(1);
+  const min = arr => Math.min(...arr);
+  const max = arr => Math.max(...arr);
+
+  document.getElementById('aggGrid').innerHTML = `
+    <div class="agg-item">
+      <div class="agg-label">Avg Moisture</div>
+      <div class="agg-value">${avg(moistures)} <span class="agg-unit">/ 1023</span></div>
+      <div class="agg-range">${min(moistures)} – ${max(moistures)}</div>
+    </div>
+    <div class="agg-item">
+      <div class="agg-label">Avg Temp</div>
+      <div class="agg-value">${avg(temps)}<span class="agg-unit">°C</span></div>
+      <div class="agg-range">${min(temps).toFixed(1)} – ${max(temps).toFixed(1)}</div>
+    </div>
+    <div class="agg-item">
+      <div class="agg-label">Avg Humidity</div>
+      <div class="agg-value">${avg(humids)}<span class="agg-unit">%</span></div>
+      <div class="agg-range">${min(humids).toFixed(1)} – ${max(humids).toFixed(1)}</div>
+    </div>
+    <div class="agg-item">
+      <div class="agg-label">Sunlight HI</div>
+      <div class="agg-value">${hiPct}<span class="agg-unit">%</span></div>
+      <div class="agg-range">${hiCount} of ${data.length} readings</div>
+    </div>
+  `;
+}
+
+function renderDiagnoses(diagnoses) {
+  const grid = document.getElementById('diagGrid');
+  grid.innerHTML = diagnoses.map(d => `
+    <div class="diag-item">
+      <div class="diag-thumb">${d.emoji}</div>
+      <div class="diag-label">${d.predicted_class}</div>
+      <div class="diag-conf">${d.confidence}% conf</div>
+      <span class="diag-badge ${d.severity}">${d.severity}</span>
+    </div>
+  `).join('');
+}
+
+function renderAggregateDiagnosis(diagnoses) {
+  const card = document.getElementById('aggDiagCard');
+  const total = diagnoses.length;
+  const healthyCount = diagnoses.filter(d => d.severity === 'healthy').length;
+  const warningCount = diagnoses.filter(d => d.severity === 'warning').length;
+  const dangerCount  = diagnoses.filter(d => d.severity === 'danger').length;
+
+  const healthyPct = ((healthyCount / total) * 100).toFixed(0);
+  const avgConf = (diagnoses.reduce((a, d) => a + d.confidence, 0) / total).toFixed(1);
+
+  // Count unique disease classes (excluding Healthy)
+  const diseases = [...new Set(
+    diagnoses.filter(d => d.severity !== 'healthy').map(d => d.predicted_class)
+  )];
+
+  let overallSeverity, overallLabel, overallMessage;
+  if (dangerCount > 0) {
+    overallSeverity = 'danger';
+    overallLabel = 'Attention Needed';
+    overallMessage = `${dangerCount} of ${total} snapshots flagged severe issues. Diseases detected: ${diseases.join(', ')}.`;
+  } else if (warningCount > 0) {
+    overallSeverity = 'warning';
+    overallLabel = 'Minor Concerns';
+    overallMessage = `${warningCount} of ${total} snapshots show mild symptoms. Watch for: ${diseases.join(', ')}.`;
+  } else {
+    overallSeverity = 'healthy';
+    overallLabel = 'All Clear';
+    overallMessage = `All ${total} snapshots classified as healthy with ${avgConf}% average confidence.`;
+  }
+
+  card.innerHTML = `
+    <div class="card-title">
+      <span class="icon" style="background:var(--accent-green-dim);color:var(--accent-green);">📋</span>
+      Aggregate Diagnosis
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+      <span class="diag-badge ${overallSeverity}" style="font-size:13px;padding:6px 14px;">${overallLabel}</span>
+      <span style="font-size:12px;color:var(--text-secondary);">avg conf: ${avgConf}%</span>
+    </div>
+    <p style="font-size:13px;color:var(--text-secondary);line-height:1.5;">${overallMessage}</p>
+    <div style="margin-top:12px;display:flex;gap:8px;">
+      <div style="flex:${healthyCount};height:6px;border-radius:3px;background:var(--accent-green);"></div>
+      <div style="flex:${warningCount || 0.01};height:6px;border-radius:3px;background:var(--accent-amber);"></div>
+      <div style="flex:${dangerCount || 0.01};height:6px;border-radius:3px;background:var(--accent-coral);"></div>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text-muted);margin-top:4px;">
+      <span>Healthy ${healthyCount}</span>
+      <span>Warning ${warningCount}</span>
+      <span>Danger ${dangerCount}</span>
+    </div>
+  `;
+}
+
+
+// ═══════════════════════════════════════════════════════════
+//  GROWTH TRACKING
+// ═══════════════════════════════════════════════════════════
+
+function computeGrowthRates(data) {
+  // Compute growth rate (cm/day) between consecutive measurements
+  const rates = [];
+  for (let i = 1; i < data.length; i++) {
+    const dt = (new Date(data[i].timestamp) - new Date(data[i-1].timestamp)) / (1000*60*60*24); // days
+    const dh = data[i].height_cm - data[i-1].height_cm;
+    const rate = dt > 0 ? +(dh / dt).toFixed(3) : 0;
+    rates.push({
+      timestamp: data[i].timestamp,
+      rate_cm_per_day: rate,
+    });
+  }
+  return rates;
+}
+
+function linearRegression(data) {
+  // Simple OLS on height vs time for trend line + prediction
+  const xs = data.map(d => (new Date(d.timestamp).getTime()));
+  const ys = data.map(d => d.height_cm);
+  const n = xs.length;
+  const x0 = xs[0];
+  // Normalize x to days from first reading
+  const xd = xs.map(x => (x - x0) / (1000*60*60*24));
+  const sumX = xd.reduce((a,b) => a+b, 0);
+  const sumY = ys.reduce((a,b) => a+b, 0);
+  const sumXY = xd.reduce((a, x, i) => a + x * ys[i], 0);
+  const sumX2 = xd.reduce((a, x) => a + x*x, 0);
+  const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+  const intercept = (sumY - slope * sumX) / n;
+
+  // R² calculation
+  const yMean = sumY / n;
+  const ssTot = ys.reduce((a, y) => a + (y - yMean) ** 2, 0);
+  const ssRes = ys.reduce((a, y, i) => a + (y - (intercept + slope * xd[i])) ** 2, 0);
+  const r2 = ssTot > 0 ? 1 - ssRes / ssTot : 0;
+
+  return {
+    slope,       // cm per day
+    intercept,   // cm at first reading
+    r2,
+    x0,          // epoch ms of first reading
+    predict(dateMs) {
+      const daysSinceStart = (dateMs - x0) / (1000*60*60*24);
+      return +(intercept + slope * daysSinceStart).toFixed(2);
+    },
+    trendLine(data) {
+      return data.map(d => ({
+        x: new Date(d.timestamp),
+        y: +((intercept + slope * ((new Date(d.timestamp).getTime() - x0) / (1000*60*60*24)))).toFixed(2),
+      }));
+    },
+  };
+}
+
+function renderGrowthCharts(data) {
+  const timestamps = data.map(d => new Date(d.timestamp));
+  const heights = data.map(d => d.height_cm);
+  const reg = linearRegression(data);
+  const trendData = reg.trendLine(data);
+
+  // Height chart with trend line
+  const ctxH = document.getElementById('chartHeight').getContext('2d');
+  charts.height = new Chart(ctxH, {
+    type: 'line',
+    data: {
+      labels: timestamps,
+      datasets: [
+        {
+          label: 'Height',
+          data: heights,
+          borderColor: '#4ecb71',
+          backgroundColor: createGradient(ctxH, 'rgba(78,203,113,0.25)', 'rgba(78,203,113,0)'),
+          fill: true,
+          pointBackgroundColor: '#162119',
+          pointBorderColor: '#4ecb71',
+        },
+        {
+          label: 'Trend',
+          data: trendData.map(d => d.y),
+          borderColor: 'rgba(78,203,113,0.4)',
+          borderDash: [6, 4],
+          borderWidth: 2,
+          pointRadius: 0,
+          fill: false,
+        },
+      ],
+    },
+    options: {
+      ...chartDefaults,
+      plugins: {
+        ...chartDefaults.plugins,
+        legend: {
+          display: true,
+          labels: {
+            color: '#5c7a63',
+            font: { family: 'DM Sans', size: 10 },
+            boxWidth: 12, boxHeight: 2,
+            padding: 12,
+          },
+        },
+      },
+      scales: {
+        ...chartDefaults.scales,
+        y: { ...chartDefaults.scales.y,
+          ticks: { ...chartDefaults.scales.y.ticks, callback: v => v + ' cm' } },
+      },
+    },
+  });
+
+  // Growth rate bar chart
+  const rates = computeGrowthRates(data);
+  const rateTimestamps = rates.map(r => new Date(r.timestamp));
+  const rateValues = rates.map(r => r.rate_cm_per_day);
+
+  const ctxR = document.getElementById('chartGrowthRate').getContext('2d');
+  charts.growthRate = new Chart(ctxR, {
+    type: 'bar',
+    data: {
+      labels: rateTimestamps,
+      datasets: [{
+        data: rateValues,
+        backgroundColor: rateValues.map(v =>
+          v >= 0 ? 'rgba(58,181,160,0.7)' : 'rgba(224,107,94,0.7)'
+        ),
+        borderColor: rateValues.map(v =>
+          v >= 0 ? '#3ab5a0' : '#e06b5e'
+        ),
+        borderWidth: 1,
+        borderRadius: 4,
+      }],
+    },
+    options: {
+      ...chartDefaults,
+      scales: {
+        ...chartDefaults.scales,
+        y: { ...chartDefaults.scales.y,
+          ticks: { ...chartDefaults.scales.y.ticks, callback: v => v.toFixed(1) + ' cm/d' } },
+      },
+    },
+  });
+
+  return reg;
+}
+
+function renderPrediction(data, reg) {
+  const card = document.getElementById('predictCard');
+  const now = Date.now();
+  const oneWeek = 7 * 24 * 60 * 60 * 1000;
+  const futureDate = new Date(now + oneWeek);
+
+  const currentHeight = data[data.length - 1].height_cm;
+  const predictedHeight = reg.predict(now + oneWeek);
+  const growthDelta = +(predictedHeight - currentHeight).toFixed(2);
+  const dailyRate = +reg.slope.toFixed(2);
+  const r2Pct = (reg.r2 * 100).toFixed(1);
+
+  // Determine confidence label
+  let confLabel, confClass;
+  if (reg.r2 > 0.85) { confLabel = 'High'; confClass = 'healthy'; }
+  else if (reg.r2 > 0.6) { confLabel = 'Moderate'; confClass = 'warning'; }
+  else { confLabel = 'Low'; confClass = 'danger'; }
+
+  card.innerHTML = `
+    <div class="card-title">
+      <span class="icon" style="background:var(--accent-green-dim);color:var(--accent-green);">🌱</span>
+      7-Day Height Forecast
+    </div>
+    <div class="predict-row">
+      <div class="predict-hero">
+        <div class="big-num">${predictedHeight}</div>
+        <div class="big-unit">cm</div>
+      </div>
+      <div class="predict-details">
+        <div class="detail-row">
+          <span class="detail-label">Current height</span>
+          <span class="detail-value">${currentHeight} cm</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Expected gain</span>
+          <span class="detail-value" style="color:${growthDelta >= 0 ? 'var(--accent-green)' : 'var(--accent-coral)'}">
+            ${growthDelta >= 0 ? '+' : ''}${growthDelta} cm
+          </span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Growth rate</span>
+          <span class="detail-value">${dailyRate} cm/day</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Forecast date</span>
+          <span class="detail-value">${futureDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Confidence (R²)</span>
+          <span class="detail-value">
+            <span class="diag-badge ${confClass}" style="font-size:10px;">${confLabel}</span>
+            ${r2Pct}%
+          </span>
+        </div>
+      </div>
+    </div>
+    <div class="predict-method">
+      Linear regression on ${data.length} height measurements · slope = ${dailyRate} cm/day
+    </div>
+  `;
+}
+
+
+// ═══════════════════════════════════════════════════════════
+//  INITIALIZATION
+// ═══════════════════════════════════════════════════════════
+
+async function loadDashboard() {
+  destroyCharts();
+  const { data_points, diagnoses } = await DataService.getData(14);
+
+  renderStatusPills(data_points);
+  renderCharts(data_points);
+  renderSunlight(data_points);
+  renderAggregates(data_points);
+  const regression = renderGrowthCharts(data_points);
+  renderPrediction(data_points, regression);
+  renderDiagnoses(diagnoses);
+  renderAggregateDiagnosis(diagnoses);
+}
+
+function setSource(src) {
+  DataService.setSource(src);
+  document.querySelectorAll('.source-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.textContent.trim().toLowerCase().includes(src === 'dummy' ? 'dummy' : 'fast'));
+  });
+  loadDashboard();
+}
+
+loadDashboard();
+</script>
+</body>
+</html>
