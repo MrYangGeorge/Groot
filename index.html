@@ -362,12 +362,6 @@
     <span class="badge">● Live</span>
   </div>
 
-  <!-- Data source toggle -->
-  <div class="source-toggle">
-    <button class="source-btn active" onclick="setSource('dummy')">Dummy Data</button>
-    <button class="source-btn" onclick="setSource('api')">FastAPI Server</button>
-  </div>
-
   <!-- Status pills -->
   <div class="status-strip" id="statusStrip"></div>
 
@@ -429,30 +423,8 @@
     <div class="chart-wrap"><canvas id="chartHeight"></canvas></div>
   </div>
 
-  <!-- Growth rate chart -->
-  <div class="card delay-5c" style="animation-delay:0.30s;">
-    <div class="card-title">
-      <span class="icon" style="background:var(--accent-teal-dim);color:var(--accent-teal);">📈</span>
-      Growth Rate
-    </div>
-    <div class="chart-wrap"><canvas id="chartGrowthRate"></canvas></div>
-  </div>
-
   <!-- 1-week prediction -->
   <div class="predict-card delay-5d" style="animation-delay:0.33s;" id="predictCard"></div>
-
-  <!-- Section: Plant Diagnosis -->
-  <div class="section-label">Plant Diagnosis</div>
-  <div class="card delay-6">
-    <div class="card-title">
-      <span class="icon" style="background:var(--accent-green-dim);color:var(--accent-green);">🔬</span>
-      crop-leaf-diseases-vit results
-    </div>
-    <p style="font-size:12px;color:var(--text-secondary);margin-bottom:14px;">
-      Each snapshot was passed through <code style="color:var(--accent-teal);background:var(--accent-teal-dim);padding:2px 6px;border-radius:4px;font-size:11px;">wambugu71/crop_leaf_diseases_vit</code>. Aggregated diagnosis below.
-    </p>
-    <div class="diagnosis-grid" id="diagGrid"></div>
-  </div>
 
   <!-- Aggregate diagnosis -->
   <div class="card delay-7" id="aggDiagCard"></div>
@@ -474,7 +446,7 @@ const DataService = (() => {
   let currentSource = "dummy"; // "dummy" | "api"
 
   // ── Dummy data generator ──
-  function _generateDummyData(n = 14) {
+  function _generateData(n = 14) {
     const now = Date.now();
     const weekMs = 7 * 24 * 60 * 60 * 1000;
     const startTime = now - weekMs;
@@ -533,7 +505,7 @@ const DataService = (() => {
 
   // ── Dummy diagnosis results ──
   // Simulates running each image through crop-leaf-diseases-vit
-  function _generateDummyDiagnoses(dataPoints) {
+  function _generateDiagnoses(dataPoints) {
     const classes = [
       { label: "Healthy", severity: "healthy" },
       { label: "Leaf Spot", severity: "warning" },
@@ -587,8 +559,8 @@ const DataService = (() => {
           // Fall through to dummy
         }
       }
-      const points = _generateDummyData(n);
-      const diagnoses = _generateDummyDiagnoses(points);
+      const points = _generateData(n);
+      const diagnoses = _generateDiagnoses(points);
       return { data_points: points, diagnoses };
     }
   };
@@ -990,38 +962,6 @@ function renderGrowthCharts(data) {
         ...chartDefaults.scales,
         y: { ...chartDefaults.scales.y,
           ticks: { ...chartDefaults.scales.y.ticks, callback: v => v + ' cm' } },
-      },
-    },
-  });
-
-  // Growth rate bar chart
-  const rates = computeGrowthRates(data);
-  const rateTimestamps = rates.map(r => new Date(r.timestamp));
-  const rateValues = rates.map(r => r.rate_cm_per_day);
-
-  const ctxR = document.getElementById('chartGrowthRate').getContext('2d');
-  charts.growthRate = new Chart(ctxR, {
-    type: 'bar',
-    data: {
-      labels: rateTimestamps,
-      datasets: [{
-        data: rateValues,
-        backgroundColor: rateValues.map(v =>
-          v >= 0 ? 'rgba(58,181,160,0.7)' : 'rgba(224,107,94,0.7)'
-        ),
-        borderColor: rateValues.map(v =>
-          v >= 0 ? '#3ab5a0' : '#e06b5e'
-        ),
-        borderWidth: 1,
-        borderRadius: 4,
-      }],
-    },
-    options: {
-      ...chartDefaults,
-      scales: {
-        ...chartDefaults.scales,
-        y: { ...chartDefaults.scales.y,
-          ticks: { ...chartDefaults.scales.y.ticks, callback: v => v.toFixed(1) + ' cm/d' } },
       },
     },
   });
