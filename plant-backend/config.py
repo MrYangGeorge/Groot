@@ -22,6 +22,11 @@ CLAUDE_MODEL: str = os.getenv("CLAUDE_MODEL", "claude-opus-4-5")
 PLANT_NAME: str = os.getenv("PLANT_NAME", "Groot")
 PLANT_SPECIES: str = os.getenv("PLANT_SPECIES", "monstera deliciosa")
 
+ELEVENLABS_API_KEY: str = os.getenv("ELEVENLABS_API_KEY", "")
+ELEVENLABS_VOICE_ID: str = os.getenv("ELEVENLABS_VOICE_ID", "")
+ELEVENLABS_TTS_MODEL: str = os.getenv("ELEVENLABS_TTS_MODEL", "eleven_flash_v2_5")
+ELEVENLABS_STT_MODEL: str = os.getenv("ELEVENLABS_STT_MODEL", "scribe_v1")
+
 # Sentinel lower bound required by Viam APP-10891 workaround — every SQL query
 # must include a literal >= this timestamp clause, even when a real lower
 # bound also exists.
@@ -33,6 +38,23 @@ def require_anthropic_credentials() -> None:
         raise RuntimeError(
             "Missing ANTHROPIC_API_KEY in .env. Copy .env.example and fill "
             "it in before running LLM features."
+        )
+
+
+def require_elevenlabs_credentials() -> None:
+    missing = [
+        name
+        for name, value in (
+            ("ELEVENLABS_API_KEY", ELEVENLABS_API_KEY),
+            ("ELEVENLABS_VOICE_ID", ELEVENLABS_VOICE_ID),
+        )
+        if not value or value == "replace-me"
+    ]
+    if missing:
+        raise RuntimeError(
+            f"Missing ElevenLabs configuration in .env: {', '.join(missing)}. "
+            "Pick a voice at https://elevenlabs.io/app/voice-lab and paste "
+            "the voice ID into ELEVENLABS_VOICE_ID."
         )
 
 

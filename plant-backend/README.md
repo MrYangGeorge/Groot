@@ -27,6 +27,9 @@ or any HTTP surface — only the data plumbing.
 | `responder.py` | Public API: `answer_user_query` and `autonomous_message`. |
 | `triggers.py` | Policy for when the poller should fire an autonomous message. |
 | `cli.py` | Manual testing CLI for the LLM layer. |
+| `elevenlabs_client.py` | STT (Scribe v1) + TTS (Flash v2.5) wrappers. |
+| `audio_io.py` | Mic capture + speaker playback helpers. |
+| `voice.py` | Spacebar push-to-talk entry point. |
 
 ## Setup
 
@@ -140,6 +143,81 @@ are logged to the `plant_messages` table. The poller calls the trigger
 policy in `triggers.py` after every tick, so leaving `python poller.py`
 running against live (or mock) data will produce occasional in-character
 outbursts.
+
+## Voice mode (spacebar push-to-talk)
+
+The fun one. `voice.py` wraps the LLM layer with mic input and speaker
+output so you can just hold space and talk.
+
+### Prerequisites
+
+- Working microphone and speaker.
+- An ElevenLabs account. Pick a voice from
+  [voice-lab](https://elevenlabs.io/app/voice-lab) (a theatrical British
+  male voice suits this persona well) and put its ID in
+  `ELEVENLABS_VOICE_ID` in `.env`. Also set `ELEVENLABS_API_KEY`.
+- `ANTHROPIC_API_KEY` already set (the voice layer calls the LLM layer).
+- **macOS only:** grant your terminal app three permissions in
+  System Settings → Privacy & Security:
+  - **Microphone** (for `sounddevice`)
+  - **Input Monitoring** and **Accessibility** (both for `pynput` — the
+    spacebar listener needs them)
+  First launch will silently do nothing if these aren't granted; quit the
+  process, grant the permission, and re-run.
+- **Linux:** run inside a graphical session (not bare SSH) so `pynput` can
+  attach to the keyboard, and install PortAudio dev headers before
+  `pip install -r requirements.txt`:
+  `sudo apt install portaudio19-dev`.
+
+### Run
+
+```bash
+python voice.py
+```
+
+Hold `SPACE`, speak, release. The plant transcribes your speech, thinks
+about it, and answers aloud. Press `Q` to quit.
+
+Each response is cached to `audio_cache/response_<id>.mp3` — if a judge
+asks "can it say that again?", you have every line on disk.
+
+### Troubleshooting
+
+- **"no mic input"** — check System Settings → Privacy → Microphone.
+- **"spacebar not detected" on macOS** — check Accessibility + Input
+  Monitoring, and fully quit/relaunch the terminal after granting.
+- **"voice sounds robotic"** — you're probably on a cheap default voice.
+  Pick a different one in the ElevenLabs voice library and paste the new
+  ID into `.env`.
+- **MP3 playback fails** — on older libsndfile installs `soundfile` can't
+  decode MP3. `audio_io.play_audio` falls back to `afplay` on macOS and
+  `ffplay` elsewhere. If neither is on `PATH`, install `ffmpeg`
+  (`brew install ffmpeg` / `apt install ffmpeg`).
+- **"too short -- hold spacebar longer"** — minimum capture is 0.3s to
+  avoid sending empty audio to the API.
+
+## Demo script
+
+For the judges' table, in order:
+
+1. **Seed** the DB with realistic mock data right before the demo:
+   ```bash
+   python mock_data.py --reset --duration-hours 24 --speed 100000
+   ```
+   (optional) nudge a watering into recent history:
+   ```bash
+   sqlite3 plant.db "INSERT INTO watering_events (timestamp, moisture_before, moisture_after) VALUES (datetime('now','-2 hours'), 22.0, 76.0);"
+   ```
+2. **Start** `python voice.py` in a terminal the judges can see.
+3. **Land these five questions in order** — don't improvise, these are
+   tested to show off different parts of the stack:
+   1. "How are you feeling?" — current state summary
+   2. "When did I last water you?" — text-to-SQL over `watering_events`
+   3. "Have I been a good plant parent?" — history + persona
+   4. "What's the weather outside?" — graceful "I don't know" in character
+   5. "Am I going to be okay?" — emotional flourish; the persona shines
+4. **Stop after five.** 90 seconds of polished demo beats 3 minutes of
+   rambling every time.
 
 ## Notes / gotchas
 
